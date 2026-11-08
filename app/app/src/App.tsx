@@ -187,23 +187,46 @@ export default function App() {
             </div>
           </section>
 
-          <section className="lists">
-            {me && (
-              <EqubList
-                title="Your equbs"
-                empty="You haven’t joined an equb yet."
-                items={mine}
-                me={me}
-                onPick={setSelected}
-              />
-            )}
-            <EqubList
-              title="Open equbs you can join"
-              empty={loading ? 'Looking for open equbs…' : 'No open equbs right now. Start one and share the link.'}
-              items={open}
-              me={me}
-              onPick={setSelected}
-            />
+          <section className="about" aria-labelledby="what">
+            <div className="about-lead">
+              <h2 id="what">What’s an equb?</h2>
+              <p>
+                An equb (<span lang="am">እቁብ</span>) is a savings circle used across
+                Ethiopia and the diaspora. Friends, family or coworkers agree to pay the
+                same amount every week or month. Each round, one member takes the whole
+                pot, until everyone has had a turn. People use it to pay school fees,
+                start a business or send money home, with no bank and no interest.
+              </p>
+            </div>
+            <dl className="about-points">
+              <div>
+                <dt>The problem</dt>
+                <dd>
+                  Someone has to collect and hold the cash. If they disappear, or pay
+                  their favorite first, the group can’t stop them. Members abroad also
+                  lose money to transfer fees.
+                </dd>
+              </div>
+              <div>
+                <dt>What this app changes</dt>
+                <dd>
+                  Contributions go into a vault that only a Solana program controls, and
+                  the payout order is enforced by that program. Anyone can check the
+                  vault. Members pay in USDC, a digital dollar, from any country in
+                  seconds, for less than a cent.
+                </dd>
+              </div>
+              <div>
+                <dt>Try it yourself</dt>
+                <dd>
+                  You need a <a href="https://phantom.com" target="_blank" rel="noreferrer">Phantom</a> wallet
+                  set to Solana devnet, a little test SOL
+                  from <a href="https://faucet.solana.com" target="_blank" rel="noreferrer">faucet.solana.com</a>,
+                  and test USDC from <a href="https://faucet.circle.com" target="_blank" rel="noreferrer">faucet.circle.com</a>.
+                  This demo runs on Solana’s test network, so no real money moves.
+                </dd>
+              </div>
+            </dl>
           </section>
 
           <section className="steps" aria-labelledby="how">
@@ -223,6 +246,26 @@ export default function App() {
               </li>
             </ol>
           </section>
+
+          <section className="lists">
+            {me && (
+              <EqubList
+                title="Your equbs"
+                empty="You haven’t joined an equb yet."
+                items={mine}
+                me={me}
+                onPick={setSelected}
+              />
+            )}
+            <EqubList
+              title="Open equbs you can join"
+              empty={loading ? 'Looking for open equbs…' : 'No open equbs right now. Start one and share the link.'}
+              items={open}
+              me={me}
+              onPick={setSelected}
+            />
+          </section>
+
         </main>
       )}
 

@@ -23,6 +23,8 @@ import {
   toUsdc,
   voteEmergency,
 } from './lib/equb'
+import { SeatRing, type Seat } from './SeatRing'
+import { RoundsBand } from './RoundsBand'
 
 type Toast = { kind: 'ok' | 'err'; text: string; sig?: string }
 
@@ -64,6 +66,7 @@ export default function App() {
     if (selected) url.searchParams.set('equb', selected)
     else url.searchParams.delete('equb')
     history.replaceState(null, '', url)
+    window.scrollTo({ top: 0 })
   }, [selected])
 
   const run = async (label: string, fn: () => Promise<string>, done: string) => {
@@ -83,27 +86,22 @@ export default function App() {
   }
 
   const current = equbs.find((e) => e.address.toString() === selected)
-  const mine = me
-    ? equbs.filter((e) => e.data.members.some((m) => m.equals(me)))
-    : []
-  const open = equbs.filter(
-    (e) => e.status === 'open' && !(me && e.data.members.some((m) => m.equals(me))),
-  )
+  const isMine = (e: EqubView) => !!me && e.data.members.some((m) => m.equals(me))
+  const mine = equbs.filter(isMine)
+  const open = equbs.filter((e) => e.status === 'open' && !isMine(e))
 
   return (
-    <div className="shell">
-      <header className="top">
-        <button className="brand" onClick={() => setSelected(null)}>
-          <span className="mark" aria-hidden>
-            <svg viewBox="0 0 64 64">
-              <circle cx="32" cy="32" r="18" fill="none" stroke="currentColor" strokeWidth="5" strokeDasharray="14 5" />
-              <circle cx="32" cy="14" r="6" fill="currentColor" />
-            </svg>
-          </span>
-          Equb
+    <div className="page">
+      <header className="masthead">
+        <button className="brand" onClick={() => setSelected(null)} aria-label="Equb home">
+          <BrandMark />
+          <span className="brand-word">Equb</span>
+          <span className="brand-geez" lang="am">እቁብ</span>
         </button>
-        <div className="top-right">
-          <span className="net">Devnet</span>
+        <div className="masthead-right">
+          <span className="net" title="Runs on Solana's test network with test USDC">
+            <span className="net-dot" aria-hidden /> Devnet
+          </span>
           <WalletMultiButton />
         </div>
       </header>
@@ -113,14 +111,19 @@ export default function App() {
           <span>{toast.text}</span>
           {toast.sig && (
             <a href={explorerTx(toast.sig)} target="_blank" rel="noreferrer">
-              View on Solana Explorer ↗
+              See the transaction
             </a>
           )}
-          <button aria-label="Dismiss" onClick={() => setToast(null)}>×</button>
+          <button className="toast-x" aria-label="Dismiss" onClick={() => setToast(null)}>×</button>
         </div>
       )}
 
-      {current ? (
+      {selected && !current ? (
+        <main className="detail">
+          <button className="back" onClick={() => setSelected(null)}>All equbs</button>
+          <p className="quiet">{loading ? 'Loading this equb…' : 'We couldn’t find this equb on devnet. Check the link and try again.'}</p>
+        </main>
+      ) : current ? (
         <EqubDetail
           e={current}
           me={me}
@@ -129,100 +132,138 @@ export default function App() {
           connection={connection}
           actions={{
             join: () =>
-              run('join', () => joinEqub(program, me!, current.address), 'You joined the equb.'),
+              run('join', () => joinEqub(program, me!, current.address), 'You joined. Your seat is saved.'),
             contribute: () =>
-              run('contribute', () => contribute(program, me!, current), 'Contribution received. 🙌'),
+              run('contribute', () => contribute(program, me!, current), 'Contribution sent to the pot.'),
             payout: () =>
-              run('payout', () => payout(program, me!, current), 'Pot paid out!'),
+              run('payout', () => payout(program, me!, current), 'Pot paid out.'),
             propose: (ben: PublicKey, reason: string) =>
               run(
                 'propose',
                 () => proposeEmergency(program, me!, current.address, ben, reason),
-                'Emergency request sent to the group.',
+                'Request sent. Members can vote now.',
               ),
             vote: (yes: boolean) =>
               run(
                 'vote',
                 () => voteEmergency(program, me!, current.address, yes),
-                yes ? 'You voted yes.' : 'You voted no.',
+                yes ? 'You approved the request.' : 'You declined the request.',
               ),
           }}
         />
       ) : (
-        <>
+        <main>
           <section className="hero">
-            <p className="eyebrow">እቁብ · rotating savings, on-chain</p>
-            <h1>
-              Save together.
-              <br />
-              <em>Nobody runs off with the pot.</em>
-            </h1>
-            <p className="lede">
-              Start an equb with family and friends anywhere in the world. Everyone
-              chips in USDC each round, and a Solana program — not a person — holds the
-              money and pays each member in turn.
-            </p>
+            <div className="hero-copy">
+              <h1>Your equb, without anyone holding the cash.</h1>
+              <p className="lede">
+                Start a savings circle with family and friends in any city. Everyone
+                pays in USDC each round. A Solana program keeps the pot and pays each
+                member in turn, so nobody can walk off with it.
+              </p>
+              <CreateForm
+                disabled={!me}
+                busy={busy === 'create'}
+                onCreate={(name, amount, members) =>
+                  run(
+                    'create',
+                    async () => {
+                      const { sig, equb } = await createEqub(program, me!, name, amount, members)
+                      setSelected(equb.toString())
+                      return sig
+                    },
+                    'Equb created. Copy the invite link to add members.',
+                  )
+                }
+              />
+            </div>
+            <div className="hero-ring" aria-hidden>
+              <SeatRing
+                seats={DEMO_SEATS}
+                centerAmount="300"
+                centerCaption="USDC this round"
+                animatePot
+              />
+            </div>
           </section>
 
-          <div className="grid">
-            <CreateCard
-              disabled={!me}
-              busy={busy === 'create'}
-              onCreate={(name, amount, members) =>
-                run(
-                  'create',
-                  async () => {
-                    const { sig, equb } = await createEqub(program, me!, name, amount, members)
-                    setSelected(equb.toString())
-                    return sig
-                  },
-                  'Equb created. Share the link so members can join.',
-                )
-              }
-            />
-
-            <div className="lists">
-              {me && (
-                <EqubList
-                  title="Your equbs"
-                  empty="You're not in any equb yet."
-                  items={mine}
-                  me={me}
-                  onPick={setSelected}
-                />
-              )}
+          <section className="lists">
+            {me && (
               <EqubList
-                title="Open to join"
-                empty={loading ? 'Loading…' : 'No open equbs right now. Start one!'}
-                items={open}
+                title="Your equbs"
+                empty="You haven’t joined an equb yet."
+                items={mine}
                 me={me}
                 onPick={setSelected}
               />
-            </div>
-          </div>
+            )}
+            <EqubList
+              title="Open equbs you can join"
+              empty={loading ? 'Looking for open equbs…' : 'No open equbs right now. Start one and share the link.'}
+              items={open}
+              me={me}
+              onPick={setSelected}
+            />
+          </section>
 
-          <section className="how">
-            <h2>How it works</h2>
+          <section className="steps" aria-labelledby="how">
+            <h2 id="how">How a round works</h2>
             <ol>
-              <li><b>Create</b> an equb: amount per round and number of members.</li>
-              <li><b>Invite</b> people with a link. It starts when every seat is filled.</li>
-              <li><b>Contribute</b> each round. The pot pays the next person automatically.</li>
-              <li><b>Emergency?</b> Ask the group. A majority vote moves you to the front.</li>
+              <li>
+                <b>Start it.</b> Pick the amount per round and how many people.
+              </li>
+              <li>
+                <b>Invite.</b> Share the link. The equb begins when every seat is taken.
+              </li>
+              <li>
+                <b>Pay in.</b> Each member sends their share. When all have paid, the pot goes to the next seat.
+              </li>
+              <li>
+                <b>Need it early?</b> Ask the group. If most members agree, you move to the front.
+              </li>
             </ol>
           </section>
-        </>
+        </main>
       )}
 
       <footer className="foot">
-        Built for the MLH Solana Hackathon · funds are devnet USDC (test money)
+        Built for the MLH Solana Hackathon. Runs on Solana devnet with test USDC.
       </footer>
     </div>
   )
 }
 
+const DEMO_SEATS: Seat[] = [
+  { label: '1', state: 'received' },
+  { label: '2', state: 'next', paid: true },
+  { label: '3', state: 'waiting', paid: true },
+  { label: '4', state: 'waiting', paid: true },
+  { label: '5', state: 'waiting' },
+  { label: '6', state: 'waiting', paid: true },
+]
+
+function BrandMark() {
+  return (
+    <svg className="brand-mark" viewBox="0 0 32 32" aria-hidden>
+      {[...Array(6)].map((_, i) => {
+        const a = (-90 + i * 60) * (Math.PI / 180)
+        return (
+          <circle
+            key={i}
+            cx={16 + 11 * Math.cos(a)}
+            cy={16 + 11 * Math.sin(a)}
+            r={i === 0 ? 4.2 : 2.6}
+            className={i === 0 ? 'bm-next' : i < 3 ? 'bm-paid' : 'bm-wait'}
+          />
+        )
+      })}
+    </svg>
+  )
+}
+
 // ---------------------------------------------------------------- create
 
-function CreateCard(props: {
+function CreateForm(props: {
   disabled: boolean
   busy: boolean
   onCreate: (name: string, amount: number, members: number) => void
@@ -238,8 +279,8 @@ function CreateCard(props: {
     const m = Number(members)
     if (!name.trim()) return setErr('Give your equb a name.')
     if (name.length > 32) return setErr('Keep the name under 32 characters.')
-    if (!(a > 0)) return setErr('Amount must be more than 0.')
-    if (!(m >= 2 && m <= 10)) return setErr('Choose 2 to 10 members.')
+    if (!(a > 0)) return setErr('Enter an amount above 0.')
+    if (!(m >= 2 && m <= 10)) return setErr('An equb needs 2 to 10 members.')
     setErr('')
     props.onCreate(name.trim(), a, m)
   }
@@ -247,41 +288,41 @@ function CreateCard(props: {
   const pot = Number(amount) * Number(members)
 
   return (
-    <form className="card create" onSubmit={submit}>
+    <form className="create" onSubmit={submit} noValidate>
       <h2>Start an equb</h2>
-      <label>
-        Name
+      <label className="field">
+        <span>Name</span>
         <input
           value={name}
           maxLength={32}
-          placeholder="e.g. DC Family Equb"
+          placeholder="DC family equb"
           onChange={(e) => { setName(e.target.value); setErr('') }}
         />
       </label>
-      <div className="row">
-        <label>
-          Each round (USDC)
+      <div className="field-row">
+        <label className="field">
+          <span>USDC per round</span>
           <input
-            type="number" min="0.01" step="0.01" value={amount}
+            type="number" inputMode="decimal" min="0.01" step="0.01" value={amount}
             onChange={(e) => { setAmount(e.target.value); setErr('') }}
           />
         </label>
-        <label>
-          Members
+        <label className="field">
+          <span>Members</span>
           <input
-            type="number" min="2" max="10" value={members}
+            type="number" inputMode="numeric" min="2" max="10" value={members}
             onChange={(e) => { setMembers(e.target.value); setErr('') }}
           />
         </label>
       </div>
       {pot > 0 && Number.isFinite(pot) && (
-        <p className="hint">
-          Each round, one member receives <b>{pot.toLocaleString()} USDC</b>.
+        <p className="pot-preview">
+          Each round, one person receives <b>{pot.toLocaleString()} USDC</b>.
         </p>
       )}
-      {err && <p className="err">{err}</p>}
-      <button className="btn primary" disabled={props.disabled || props.busy}>
-        {props.disabled ? 'Connect wallet to start' : props.busy ? 'Creating…' : 'Create equb'}
+      {err && <p className="err" role="alert">{err}</p>}
+      <button className="btn btn-main" disabled={props.disabled || props.busy}>
+        {props.disabled ? 'Connect a wallet to start' : props.busy ? 'Creating…' : 'Create equb'}
       </button>
     </form>
   )
@@ -300,32 +341,60 @@ function EqubList(props: {
     <section className="list">
       <h2>{props.title}</h2>
       {props.items.length === 0 ? (
-        <p className="muted">{props.empty}</p>
+        <p className="quiet">{props.empty}</p>
       ) : (
-        props.items.map((e) => (
-          <button key={e.address.toString()} className="item" onClick={() => props.onPick(e.address.toString())}>
-            <span className="item-main">
-              <b>{e.data.name}</b>
-              <span className="muted">
-                {toUsdc(e.data.contribution)} USDC / round · {e.data.members.length}/{e.data.maxMembers} members
-              </span>
-            </span>
-            <StatusPill e={e} />
-          </button>
-        ))
+        <ul>
+          {props.items.map((e) => (
+            <li key={e.address.toString()}>
+              <button className="row" onClick={() => props.onPick(e.address.toString())}>
+                <MiniRing e={e} />
+                <span className="row-main">
+                  <b>{e.data.name}</b>
+                  <span className="quiet">
+                    {toUsdc(e.data.contribution)} USDC a round, {e.data.members.length} of {e.data.maxMembers} seats taken
+                  </span>
+                </span>
+                <StatusText e={e} />
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
     </section>
   )
 }
 
-function StatusPill({ e }: { e: EqubView }) {
-  const label =
-    e.status === 'open'
-      ? 'Filling seats'
-      : e.status === 'complete'
-        ? 'Complete'
-        : `Round ${e.data.currentRound + 1} of ${e.data.members.length}`
-  return <span className={`pill ${e.status}`}>{label}</span>
+function MiniRing({ e }: { e: EqubView }) {
+  const n = e.data.maxMembers
+  return (
+    <svg className="mini-ring" viewBox="0 0 40 40" aria-hidden>
+      {[...Array(n)].map((_, i) => {
+        const a = (-90 + (i * 360) / n) * (Math.PI / 180)
+        const filled = i < e.data.members.length
+        const received = e.status !== 'open' && i < e.data.currentRound
+        const next = e.status === 'active' && i === e.data.currentRound
+        return (
+          <circle
+            key={i}
+            cx={20 + 14 * Math.cos(a)}
+            cy={20 + 14 * Math.sin(a)}
+            r={next ? 4.4 : 3.2}
+            className={next ? 'mr-next' : received ? 'mr-done' : filled ? 'mr-taken' : 'mr-open'}
+          />
+        )
+      })}
+    </svg>
+  )
+}
+
+function StatusText({ e }: { e: EqubView }) {
+  const n = e.data.maxMembers
+  if (e.status === 'open') {
+    const left = n - e.data.members.length
+    return <span className="status s-open">{left} seat{left === 1 ? '' : 's'} open</span>
+  }
+  if (e.status === 'complete') return <span className="status s-done">Complete</span>
+  return <span className="status s-active">Round {e.data.currentRound + 1} of {n}</span>
 }
 
 // ---------------------------------------------------------------- detail
@@ -347,11 +416,13 @@ function EqubDetail(props: {
   const { e, me, busy, actions } = props
   const d = e.data
   const n = d.members.length
+  const seatsLeft = d.maxMembers - n
   const myIdx = me ? d.members.findIndex((m) => m.equals(me)) : -1
   const isMember = myIdx >= 0
   const paidCount = [...Array(n)].filter((_, i) => hasBit(d.paidMask, i)).length
   const everyonePaid = e.status === 'active' && paidCount === n
   const next = e.status === 'active' ? d.members[d.currentRound] : null
+  const pot = d.contribution.muln(d.maxMembers)
 
   const [vault, setVault] = useState(0)
   const [copied, setCopied] = useState(false)
@@ -365,124 +436,138 @@ function EqubDetail(props: {
     setTimeout(() => setCopied(false), 1800)
   }
 
+  const nameOf = (m: PublicKey) => (me && m.equals(me) ? 'You' : short(m))
+
+  const seats: Seat[] = [...Array(d.maxMembers)].map((_, i) => {
+    const m = d.members[i]
+    if (!m) return { label: String(i + 1), state: 'open' }
+    const received = e.status !== 'open' && i < d.currentRound
+    const isNext = e.status === 'active' && i === d.currentRound
+    return {
+      label: String(i + 1),
+      state: received ? 'received' : isNext ? 'next' : 'waiting',
+      paid: e.status === 'active' && !received && hasBit(d.paidMask, i),
+      you: !!me && m.equals(me),
+    }
+  })
+
   return (
-    <section className="detail">
-      <button className="back" onClick={props.onBack}>← All equbs</button>
+    <main className="detail">
+      <button className="back" onClick={props.onBack}>All equbs</button>
 
       <div className="detail-head">
-        <div>
-          <h1>{d.name}</h1>
-          <p className="muted">
-            Started by {me && d.creator.equals(me) ? 'you' : short(d.creator)} ·{' '}
-            <a href={explorerAddr(e.address.toString())} target="_blank" rel="noreferrer">
-              View program account ↗
-            </a>
-          </p>
-        </div>
-        <StatusPill e={e} />
+        <h1>{d.name}</h1>
+        <StatusText e={e} />
       </div>
-
-      <div className="stats">
-        <Stat label="Each round" value={`${toUsdc(d.contribution)} USDC`} />
-        <Stat label="Pot per round" value={`${toUsdc(d.contribution.muln(d.maxMembers))} USDC`} />
-        <Stat
-          label="Held by the program"
-          value={`${toUsdc(vault)} USDC`}
-          href={explorerAddr(d.vault.toString())}
-        />
-        <Stat label="Paid this round" value={e.status === 'active' ? `${paidCount} / ${n}` : '—'} />
-      </div>
-
-      {/* ---- primary action ---- */}
-      <div className="action-bar">
-        {!me ? (
-          <p className="muted">Connect your wallet to take part.</p>
-        ) : e.status === 'open' && !isMember ? (
-          <button className="btn primary" disabled={!!busy} onClick={actions.join}>
-            {busy === 'join' ? 'Joining…' : `Join · ${d.maxMembers - n} seat${d.maxMembers - n === 1 ? '' : 's'} left`}
-          </button>
-        ) : e.status === 'open' ? (
-          <>
-            <p>
-              Waiting for {d.maxMembers - n} more member{d.maxMembers - n === 1 ? '' : 's'}. Share the link:
-            </p>
-            <button className="btn" onClick={share}>{copied ? 'Copied!' : 'Copy invite link'}</button>
-          </>
-        ) : e.status === 'active' && everyonePaid ? (
-          <button className="btn primary" disabled={!!busy} onClick={actions.payout}>
-            {busy === 'payout' ? 'Paying out…' : `Pay ${toUsdc(d.contribution.muln(n))} USDC to ${next && me.equals(next) ? 'you' : short(next!)}`}
-          </button>
-        ) : e.status === 'active' && isMember && !hasBit(d.paidMask, myIdx) ? (
-          <button className="btn primary" disabled={!!busy} onClick={actions.contribute}>
-            {busy === 'contribute' ? 'Sending…' : `Contribute ${toUsdc(d.contribution)} USDC`}
-          </button>
-        ) : e.status === 'active' && isMember ? (
-          <p>✓ You've paid this round. Waiting on {n - paidCount} other{n - paidCount === 1 ? '' : 's'}.</p>
-        ) : e.status === 'complete' ? (
-          <p>🎉 Every member has received the pot. This equb is complete.</p>
-        ) : (
-          <p className="muted">This equb is full and running.</p>
-        )}
-      </div>
+      <p className="quiet byline">
+        Started by {me && d.creator.equals(me) ? 'you' : short(d.creator)}.{' '}
+        <a href={explorerAddr(e.address.toString())} target="_blank" rel="noreferrer">
+          Check it on Solana Explorer
+        </a>
+      </p>
 
       <div className="detail-grid">
-        <Rotation e={e} me={me} />
-        {e.status === 'active' && (
-          <Emergency e={e} me={me} myIdx={myIdx} busy={busy} propose={actions.propose} vote={actions.vote} />
-        )}
+        <div className="ring-col">
+          <SeatRing
+            seats={seats}
+            centerAmount={toUsdc(vault)}
+            centerCaption="USDC in the pot now"
+          />
+          <p className="ring-proof">
+            The pot sits in a vault only the program can move.{' '}
+            <a href={explorerAddr(d.vault.toString())} target="_blank" rel="noreferrer">
+              Verify the vault
+            </a>
+          </p>
+          <ul className="legend" aria-label="Seat colors">
+            <li><i className="lg lg-next" /> Next to receive</li>
+            <li><i className="lg lg-paid" /> Paid this round</li>
+            <li><i className="lg lg-done" /> Already received</li>
+            {isMember && <li><i className="lg lg-you" /> Your seat</li>}
+          </ul>
+        </div>
+
+        <div className="side-col">
+          <div className="action">
+            {!me ? (
+              <p>Connect a wallet to join or pay in.</p>
+            ) : e.status === 'open' && !isMember ? (
+              <>
+                <p>{seatsLeft} seat{seatsLeft === 1 ? '' : 's'} left. Your place in line is the next open seat.</p>
+                <button className="btn btn-main" disabled={!!busy} onClick={actions.join}>
+                  {busy === 'join' ? 'Joining…' : 'Join this equb'}
+                </button>
+              </>
+            ) : e.status === 'open' ? (
+              <>
+                <p>Waiting for {seatsLeft} more member{seatsLeft === 1 ? '' : 's'}. The first round starts when every seat is taken.</p>
+                <button className="btn btn-line" onClick={share}>{copied ? 'Link copied' : 'Copy invite link'}</button>
+              </>
+            ) : everyonePaid ? (
+              <>
+                <p>Everyone has paid. The pot is ready for seat {d.currentRound + 1}.</p>
+                <button className="btn btn-main" disabled={!!busy} onClick={actions.payout}>
+                  {busy === 'payout' ? 'Paying out…' : `Pay ${toUsdc(d.contribution.muln(n))} USDC to ${next && me.equals(next) ? 'you' : short(next!)}`}
+                </button>
+              </>
+            ) : isMember && !hasBit(d.paidMask, myIdx) ? (
+              <>
+                <p>Round {d.currentRound + 1} is open. {paidCount} of {n} paid so far.</p>
+                <button className="btn btn-main" disabled={!!busy} onClick={actions.contribute}>
+                  {busy === 'contribute' ? 'Sending…' : `Pay ${toUsdc(d.contribution)} USDC`}
+                </button>
+              </>
+            ) : isMember && e.status === 'active' ? (
+              <p>You’ve paid for round {d.currentRound + 1}. Waiting on {n - paidCount} more.</p>
+            ) : e.status === 'complete' ? (
+              <p>Every member has received the pot. This equb is finished.</p>
+            ) : (
+              <p>This equb is full and running.</p>
+            )}
+          </div>
+
+          <dl className="facts">
+            <div><dt>Each person pays</dt><dd>{toUsdc(d.contribution)} USDC</dd></div>
+            <div><dt>Pot each round</dt><dd>{toUsdc(pot)} USDC</dd></div>
+            <div><dt>Paid this round</dt><dd>{e.status === 'active' ? `${paidCount} of ${n}` : 'Not started'}</dd></div>
+          </dl>
+
+          {e.status === 'active' && (
+            <Emergency e={e} me={me} myIdx={myIdx} busy={busy} propose={actions.propose} vote={actions.vote} nameOf={nameOf} />
+          )}
+        </div>
       </div>
-    </section>
-  )
-}
 
-function Stat(props: { label: string; value: string; href?: string }) {
-  return (
-    <div className="stat">
-      <span className="muted">{props.label}</span>
-      <b>{props.value}</b>
-      {props.href && (
-        <a href={props.href} target="_blank" rel="noreferrer">verify ↗</a>
+      {e.status !== 'open' && (
+        <RoundsBand total={d.maxMembers} done={d.currentRound} />
       )}
-    </div>
-  )
-}
 
-function Rotation({ e, me }: { e: EqubView; me?: PublicKey }) {
-  const d = e.data
-  const seats = [...Array(d.maxMembers)].map((_, i) => d.members[i])
-  return (
-    <div className="card">
-      <h2>Payout order</h2>
-      <ol className="rotation">
-        {seats.map((m, i) => {
-          const received = e.status !== 'open' && i < d.currentRound
-          const isNext = e.status === 'active' && i === d.currentRound
-          const paid = e.status === 'active' && m && hasBit(d.paidMask, i)
-          return (
-            <li key={i} className={received ? 'done' : isNext ? 'next' : ''}>
-              <span className="pos">{i + 1}</span>
-              <span className="who">
-                {m ? (
-                  <>
-                    {short(m)}
-                    {me && m.equals(me) && <span className="you">you</span>}
-                  </>
-                ) : (
-                  <span className="muted">Open seat</span>
-                )}
-              </span>
-              <span className="tag">
-                {received ? 'Received ✓' : isNext ? 'Next to receive' : ''}
-              </span>
-              {e.status === 'active' && m && (
-                <span className={`dot ${paid ? 'paid' : ''}`} title={paid ? 'Paid this round' : 'Not paid yet'} />
-              )}
-            </li>
-          )
-        })}
-      </ol>
-      {e.status === 'active' && <p className="muted small">● paid this round</p>}
-    </div>
+      <section className="order">
+        <h2>Payout order</h2>
+        <ol>
+          {[...Array(d.maxMembers)].map((_, i) => {
+            const m = d.members[i]
+            const s = seats[i]
+            return (
+              <li key={i} className={`o-${s.state}`}>
+                <span className="o-who">{m ? nameOf(m) : 'Open seat'}</span>
+                <span className="o-note">
+                  {s.state === 'received'
+                    ? 'Received'
+                    : s.state === 'next'
+                      ? 'Receives next'
+                      : s.paid
+                        ? 'Paid this round'
+                        : e.status === 'active'
+                          ? 'Not paid yet'
+                          : ''}
+                </span>
+              </li>
+            )
+          })}
+        </ol>
+      </section>
+    </main>
   )
 }
 
@@ -493,8 +578,9 @@ function Emergency(props: {
   busy: string | null
   propose: (ben: PublicKey, reason: string) => void
   vote: (yes: boolean) => void
+  nameOf: (m: PublicKey) => string
 }) {
-  const { e, me, myIdx, busy } = props
+  const { e, me, myIdx, busy, nameOf } = props
   const d = e.data
   const n = d.members.length
   const needed = Math.floor(n / 2) + 1
@@ -516,31 +602,29 @@ function Emergency(props: {
   }, [d.currentRound, me?.toString()])
 
   if (d.proposalActive) {
-    const who = me && d.proposalBeneficiary.equals(me) ? 'You' : short(d.proposalBeneficiary)
     return (
-      <div className="card emergency live">
-        <h2>Emergency request</h2>
-        <p>
-          <b>{who}</b> asked to receive the next pot.
-        </p>
-        {d.proposalReason && <blockquote>“{d.proposalReason}”</blockquote>}
-        <div className="meter" aria-label={`${yes} of ${needed} yes votes`}>
-          <div style={{ width: `${Math.min(100, (yes / needed) * 100)}%` }} />
+      <div className="emergency live">
+        <h2>{nameOf(d.proposalBeneficiary)} asked to receive the next pot</h2>
+        {d.proposalReason && <blockquote>{d.proposalReason}</blockquote>}
+        <div className="votes" role="img" aria-label={`${yes} of ${needed} approvals needed`}>
+          {[...Array(needed)].map((_, i) => (
+            <span key={i} className={i < yes ? 'v on' : 'v'} />
+          ))}
         </div>
-        <p className="muted small">
-          {yes} yes of {needed} needed · {voted}/{n} voted
+        <p className="quiet">
+          {yes} of {needed} approvals needed. {voted} of {n} members have voted.
         </p>
         {myIdx >= 0 && !iVoted ? (
-          <div className="row">
-            <button className="btn primary" disabled={!!busy} onClick={() => props.vote(true)}>
-              {busy === 'vote' ? '…' : 'Approve'}
+          <div className="btn-pair">
+            <button className="btn btn-main" disabled={!!busy} onClick={() => props.vote(true)}>
+              {busy === 'vote' ? 'Sending…' : 'Approve'}
             </button>
-            <button className="btn" disabled={!!busy} onClick={() => props.vote(false)}>
+            <button className="btn btn-line" disabled={!!busy} onClick={() => props.vote(false)}>
               Decline
             </button>
           </div>
         ) : myIdx >= 0 ? (
-          <p className="muted">You've voted.</p>
+          <p className="quiet">You’ve voted.</p>
         ) : null}
       </div>
     )
@@ -550,21 +634,20 @@ function Emergency(props: {
 
   const submit = (ev: React.FormEvent) => {
     ev.preventDefault()
-    if (!ben) return setErr('Pick who needs the pot.')
+    if (!ben) return setErr('Choose who needs the pot.')
     if (!reason.trim()) return setErr('Add a short reason so the group can decide.')
     setErr('')
     props.propose(new PublicKey(ben), reason.trim())
   }
 
   return (
-    <form className="card emergency" onSubmit={submit}>
-      <h2>Need it sooner?</h2>
-      <p className="muted">
-        In a real equb, the group can let someone take the pot early in an emergency.
-        If a majority ({needed} of {n}) approves, they move to the front of the line.
+    <form className="emergency" onSubmit={submit} noValidate>
+      <h2>Need the pot sooner?</h2>
+      <p className="quiet">
+        Ask the group. If {needed} of {n} members approve, that person moves to the front of the line.
       </p>
-      <label>
-        Who needs it
+      <label className="field">
+        <span>Who needs it</span>
         <select value={ben} onChange={(ev) => { setBen(ev.target.value); setErr('') }}>
           {eligible.map(({ m }) => (
             <option key={m.toString()} value={m.toString()}>
@@ -573,17 +656,17 @@ function Emergency(props: {
           ))}
         </select>
       </label>
-      <label>
-        Reason
+      <label className="field">
+        <span>Reason</span>
         <input
           value={reason}
           maxLength={64}
-          placeholder="e.g. Medical bill, school fees"
+          placeholder="School fees due Friday"
           onChange={(ev) => { setReason(ev.target.value); setErr('') }}
         />
       </label>
-      {err && <p className="err">{err}</p>}
-      <button className="btn" disabled={!!busy}>
+      {err && <p className="err" role="alert">{err}</p>}
+      <button className="btn btn-line" disabled={!!busy}>
         {busy === 'propose' ? 'Sending…' : 'Ask the group'}
       </button>
     </form>

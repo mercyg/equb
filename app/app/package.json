@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "sync-idl": "cp ../target/idl/equb.json src/idl/equb.json"
+    "sync-idl": "cp ../../target/idl/equb.json src/idl/equb.json"
   },
   "dependencies": {
     "@anchor-lang/core": "^1.2.2",

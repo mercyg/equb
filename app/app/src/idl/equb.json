@@ -1,0 +1,727 @@
+{
+  "address": "FD2ZBE2jZ864YojyFbnT5qmmu6qgjah9jENPXFjJd6PF",
+  "metadata": {
+    "name": "equb",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Digital equb (rotating savings circle) on Solana"
+  },
+  "instructions": [
+    {
+      "name": "contribute",
+      "docs": [
+        "Pay this round's contribution into the equb's vault."
+      ],
+      "discriminator": [
+        82,
+        33,
+        68,
+        131,
+        32,
+        0,
+        205,
+        95
+      ],
+      "accounts": [
+        {
+          "name": "member",
+          "signer": true
+        },
+        {
+          "name": "equb",
+          "writable": true
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "equb"
+          ]
+        },
+        {
+          "name": "member_token",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "relations": [
+            "equb"
+          ]
+        },
+        {
+          "name": "token_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_equb",
+      "docs": [
+        "Start a new equb. The creator is automatically member #1."
+      ],
+      "discriminator": [
+        146,
+        198,
+        35,
+        225,
+        140,
+        33,
+        134,
+        164
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "equb",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  113,
+                  117,
+                  98
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              },
+              {
+                "kind": "arg",
+                "path": "equb_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "vault",
+          "docs": [
+            "Token account owned by the equb PDA that holds everyone's contributions."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "equb"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "equb_id",
+          "type": "u64"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "contribution",
+          "type": "u64"
+        },
+        {
+          "name": "max_members",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "join_equb",
+      "docs": [
+        "Join an open equb. When the last seat fills, the equb starts."
+      ],
+      "discriminator": [
+        86,
+        167,
+        29,
+        9,
+        240,
+        23,
+        218,
+        221
+      ],
+      "accounts": [
+        {
+          "name": "member",
+          "signer": true
+        },
+        {
+          "name": "equb",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "payout",
+      "docs": [
+        "Once everyone has paid, send the whole pot to this round's recipient.",
+        "Anyone can trigger it — the program decides who gets paid, not the caller."
+      ],
+      "discriminator": [
+        149,
+        140,
+        194,
+        236,
+        174,
+        189,
+        6,
+        239
+      ],
+      "accounts": [
+        {
+          "name": "caller",
+          "docs": [
+            "Anyone may crank the payout."
+          ],
+          "signer": true
+        },
+        {
+          "name": "equb",
+          "writable": true
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "equb"
+          ]
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "relations": [
+            "equb"
+          ]
+        },
+        {
+          "name": "recipient_token",
+          "writable": true
+        },
+        {
+          "name": "token_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "propose_emergency",
+      "docs": [
+        "Emergency: ask the group to move `beneficiary` up so they receive",
+        "the very next pot. The proposer automatically votes yes."
+      ],
+      "discriminator": [
+        64,
+        112,
+        149,
+        115,
+        83,
+        214,
+        100,
+        109
+      ],
+      "accounts": [
+        {
+          "name": "member",
+          "signer": true
+        },
+        {
+          "name": "equb",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "beneficiary",
+          "type": "pubkey"
+        },
+        {
+          "name": "reason",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "vote_emergency",
+      "docs": [
+        "Vote on the open emergency request. A simple majority approves it."
+      ],
+      "discriminator": [
+        84,
+        147,
+        178,
+        77,
+        217,
+        97,
+        38,
+        174
+      ],
+      "accounts": [
+        {
+          "name": "member",
+          "signer": true
+        },
+        {
+          "name": "equb",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "approve",
+          "type": "bool"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Equb",
+      "discriminator": [
+        216,
+        246,
+        151,
+        46,
+        61,
+        244,
+        140,
+        98
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "Contributed",
+      "discriminator": [
+        196,
+        199,
+        157,
+        136,
+        180,
+        222,
+        100,
+        118
+      ]
+    },
+    {
+      "name": "EmergencyProposed",
+      "discriminator": [
+        110,
+        225,
+        137,
+        85,
+        15,
+        98,
+        238,
+        117
+      ]
+    },
+    {
+      "name": "EmergencyResolved",
+      "discriminator": [
+        40,
+        211,
+        201,
+        14,
+        244,
+        64,
+        175,
+        239
+      ]
+    },
+    {
+      "name": "EqubCreated",
+      "discriminator": [
+        224,
+        11,
+        6,
+        240,
+        54,
+        69,
+        61,
+        206
+      ]
+    },
+    {
+      "name": "MemberJoined",
+      "discriminator": [
+        156,
+        199,
+        149,
+        88,
+        193,
+        203,
+        191,
+        210
+      ]
+    },
+    {
+      "name": "PaidOut",
+      "discriminator": [
+        6,
+        137,
+        209,
+        225,
+        252,
+        53,
+        249,
+        252
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "NameTooLong",
+      "msg": "Name is too long (max 32 characters)"
+    },
+    {
+      "code": 6001,
+      "name": "ReasonTooLong",
+      "msg": "Reason is too long (max 64 characters)"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidAmount",
+      "msg": "Contribution must be greater than zero"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidMemberCount",
+      "msg": "An equb needs between 2 and 10 members"
+    },
+    {
+      "code": 6004,
+      "name": "NotOpen",
+      "msg": "This equb is no longer accepting members"
+    },
+    {
+      "code": 6005,
+      "name": "NotActive",
+      "msg": "This equb is not active"
+    },
+    {
+      "code": 6006,
+      "name": "AlreadyMember",
+      "msg": "You are already a member"
+    },
+    {
+      "code": 6007,
+      "name": "EqubFull",
+      "msg": "This equb is full"
+    },
+    {
+      "code": 6008,
+      "name": "NotMember",
+      "msg": "You are not a member of this equb"
+    },
+    {
+      "code": 6009,
+      "name": "AlreadyPaid",
+      "msg": "You already paid this round"
+    },
+    {
+      "code": 6010,
+      "name": "NotEveryonePaid",
+      "msg": "Not everyone has paid this round yet"
+    },
+    {
+      "code": 6011,
+      "name": "WrongRecipient",
+      "msg": "That token account doesn't belong to this round's recipient"
+    },
+    {
+      "code": 6012,
+      "name": "Overflow",
+      "msg": "Math overflow"
+    },
+    {
+      "code": 6013,
+      "name": "ProposalAlreadyActive",
+      "msg": "There is already an emergency request open"
+    },
+    {
+      "code": 6014,
+      "name": "NoActiveProposal",
+      "msg": "There is no emergency request open"
+    },
+    {
+      "code": 6015,
+      "name": "InvalidBeneficiary",
+      "msg": "That member has already received a pot or is already next"
+    },
+    {
+      "code": 6016,
+      "name": "AlreadyVoted",
+      "msg": "You already voted"
+    }
+  ],
+  "types": [
+    {
+      "name": "Contributed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "equb",
+            "type": "pubkey"
+          },
+          {
+            "name": "member",
+            "type": "pubkey"
+          },
+          {
+            "name": "round",
+            "type": "u8"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EmergencyProposed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "equb",
+            "type": "pubkey"
+          },
+          {
+            "name": "beneficiary",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposer",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EmergencyResolved",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "beneficiary",
+            "type": "pubkey"
+          },
+          {
+            "name": "approved",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Equb",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "equb_id",
+            "type": "u64"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "contribution",
+            "type": "u64"
+          },
+          {
+            "name": "max_members",
+            "type": "u8"
+          },
+          {
+            "name": "members",
+            "docs": [
+              "Join order == payout order (an approved emergency reorders it)."
+            ],
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "current_round",
+            "type": "u8"
+          },
+          {
+            "name": "paid_mask",
+            "docs": [
+              "Bit i set => members[i] has paid this round."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "Status"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "vault_bump",
+            "type": "u8"
+          },
+          {
+            "name": "proposal_active",
+            "type": "bool"
+          },
+          {
+            "name": "proposal_beneficiary",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposal_reason",
+            "type": "string"
+          },
+          {
+            "name": "yes_mask",
+            "type": "u16"
+          },
+          {
+            "name": "voted_mask",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EqubCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "equb",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "contribution",
+            "type": "u64"
+          },
+          {
+            "name": "max_members",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MemberJoined",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "equb",
+            "type": "pubkey"
+          },
+          {
+            "name": "member",
+            "type": "pubkey"
+          },
+          {
+            "name": "seats_filled",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PaidOut",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "equb",
+            "type": "pubkey"
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "round",
+            "type": "u8"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Status",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Open"
+          },
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Complete"
+          }
+        ]
+      }
+    }
+  ]
+}
